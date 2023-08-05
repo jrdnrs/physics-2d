@@ -1,0 +1,9 @@
+{
+    "name": "physics_2d",
+    "version": "0.0.1",
+    "description": "",
+    "scripts": {
+        "start": "parcel serve index.html --open --cache-dir .parcel-cache --dist-dir build",
+        "build": "parcel build index.html --cache-dir .parcel-cache --dist-dir build"
+    }
+}
