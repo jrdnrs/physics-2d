@@ -258,7 +258,7 @@ export type DrawerConfig = {
      */
     lockPointer: boolean;
     /**
-     * Sync every n frames.
+     * Sync every 1/n VSyncs.
      *
      * 0 = no sync
      */

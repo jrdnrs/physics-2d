@@ -51,7 +51,7 @@ for (let i = 0; i < 0; i++) {
 let held: RigidBody | undefined = undefined;
 
 let physicsSteps = 0;
-const targetPhysicsStepLength = 1000 / 800;
+const targetPhysicsStepLength = 1000 / 333;
 
 const RED_STROKE = drawer.getStyleID(new Style(undefined, "darkred", 1));
 const GREEN_STROKE = drawer.getStyleID(new Style(undefined, "darkgreen", 1));

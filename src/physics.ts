@@ -281,14 +281,14 @@ export class Collision {
 
     solveVelocityLinearOnly() {
         const relativeVelocity = Vec2.sub(this.bodyB.linearVelocity, this.bodyA.linearVelocity);
-        const relativeNormalVelocity = Vec2.dot(relativeVelocity, this.manifold.normal);
-        if (relativeNormalVelocity > 0.001) return; // already separating
+        const relativeVelocityDotNormal = Vec2.dot(relativeVelocity, this.manifold.normal);
+        if (relativeVelocityDotNormal > 0.001) return; // already separating
 
         const effectiveMass = this.bodyA.inverseMass + this.bodyB.inverseMass;
 
         const restitution = this.bodyA.restitution * this.bodyB.restitution;
 
-        const impulseMagnitude = (-(1 + restitution) * relativeNormalVelocity) / effectiveMass;
+        const impulseMagnitude = (-(1 + restitution) * relativeVelocityDotNormal) / effectiveMass;
         const impulse = Vec2.mulScalar(this.manifold.normal, impulseMagnitude);
 
         console.log(this.manifold.normal);
@@ -432,7 +432,7 @@ function capsuleInertiaTensor(radius: number, length: number): Mat2 {
     // Represents two semi-circles
     const circleTensor = circleInertiaTensor(radius);
 
-    // The semi-circles rotation point needs to be moved to the centre of the rectangle
+    // The semi-circles rotation point needs to be moved from the centre of the rectangle
     // eq. to half-length^2 for each semi-circle
     const parallelAxisDisplacement = length * length * RECIP_2;
     // Displacement on x-axis only affects rotation around y-axis
@@ -483,11 +483,11 @@ function convexPolygonMMOI(poly: Polygon): number {
 
     let polygonI = 0;
     for (const triangle of triangles) {
-        const massContribtion = triangle.getArea() / area;
+        const massContribution = triangle.getArea() / area;
         const triangleI = triangleMMOI(triangle.points[0], triangle.points[1], triangle.points[2]);
         const parallelAxisDisplacement = triangle.getCentre().sub(centroid).magnitudeSquared();
 
-        polygonI += (triangleI + parallelAxisDisplacement) * massContribtion;
+        polygonI += (triangleI + parallelAxisDisplacement) * massContribution;
     }
 
     return polygonI;
