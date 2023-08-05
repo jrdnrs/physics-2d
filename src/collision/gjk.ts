@@ -182,7 +182,7 @@ export function EPA(shapeA: Shape, shapeB: Shape, simplex: MinkowskiDiff[]): Epa
     throw new Error("EPA failed to converge");
 }
 
-export function contactPoints(edgeA: Segment, edgeB: Segment, normal: Vec2): Vec2[] {
+export function getContactPoints(edgeA: Segment, edgeB: Segment, normal: Vec2): Vec2[] {
     const points: Vec2[] = [];
 
     let reference = edgeB;
@@ -219,9 +219,9 @@ export function contactPoints(edgeA: Segment, edgeB: Segment, normal: Vec2): Vec
     const d1 = normal.dot(incident.p1) - D;
     const d2 = normal.dot(incident.p2) - D;
 
-    if (d1 > 0) points.push(incident.p1);
+    if (d1 >= 0) points.push(incident.p1);
     // Make sure not to add the same point twice
-    if (!incident.p1.equals(incident.p2) && d2 > 0) {
+    if (!incident.p1.equals(incident.p2) && d2 >= 0) {
         points.push(incident.p2);
     }
 
