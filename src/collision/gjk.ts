@@ -63,7 +63,13 @@ function checkSimplexLine(simplex: MinkowskiDiff[], direction: Vec2): boolean {
     const ao = Vec2.neg(a);
 
     // The normal is the vector perpendicular to the edge, pointing towards the origin
-    const normal = Vec2.tripleCross(ab, ao, ab).normalise();
+    let normal = Vec2.tripleCross(ab, ao, ab);
+    if (normal.isZero()) {
+        // The origin is on the line, so we can't use the triple cross product
+        // to find the normal. Instead, we just use the perpendicular of the edge.
+        normal = Vec2.perpendicular(ab);
+    }
+    normal.normalise();
 
     direction.set(normal);
     return false;
@@ -147,7 +153,10 @@ export function EPA(shapeA: Shape, shapeB: Shape, simplex: MinkowskiDiff[]): Epa
             const ab = Vec2.sub(b, a);
             const oa = a;
 
-            const normal = Vec2.tripleCross(ab, oa, ab).normalise();
+            let normal = Vec2.tripleCross(ab, oa, ab);
+            if (normal.isZero()) normal = Vec2.perpendicular(ab);
+            normal.normalise();
+
             const distance = normal.dot(a);
 
             if (distance < minDistance) {
