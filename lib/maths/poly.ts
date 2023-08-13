@@ -2,6 +2,7 @@ import Drawer from "../drawer/drawer";
 import { StyleID } from "../drawer/style";
 import Segment from "./segment";
 import { Shape } from "./shape";
+import { TAU } from "./util";
 import Vec2 from "./vec2";
 
 export class Polygon implements Shape {
@@ -32,19 +33,12 @@ export class Polygon implements Shape {
         ]).translate(centre);
     }
 
-    static fromPentagon(centre: Vec2, radius: number): Polygon {
-        const points: Vec2[] = [];
-        const angle = (Math.PI * 2) / 5;
-        for (let i = 0; i < 5; i++) {
-            points.push(new Vec2(Math.cos(angle * i) * radius, Math.sin(angle * i) * radius));
-        }
-        return new Polygon(points).translate(centre);
-    }
+    static fromNGon(centre: Vec2, radius: number, n: number): Polygon {
+        if (n < 3) throw new Error("n must be >= 3");
 
-    static fromHexagon(centre: Vec2, radius: number): Polygon {
         const points: Vec2[] = [];
-        const angle = (Math.PI * 2) / 6;
-        for (let i = 0; i < 6; i++) {
+        const angle = TAU / n;
+        for (let i = 0; i < n; i++) {
             points.push(new Vec2(Math.cos(angle * i) * radius, Math.sin(angle * i) * radius));
         }
         return new Polygon(points).translate(centre);
