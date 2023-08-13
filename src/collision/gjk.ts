@@ -16,6 +16,7 @@ export function GJK(shapeA: Shape, shapeB: Shape): GjkResult {
 
     // First direction points from poly1 to poly2
     let direction = Vec2.sub(shapeA.getCentre(), shapeB.getCentre()).normalise();
+    if (direction.isZero()) direction.x = 1;
     simplex.push(new MinkowskiDiff(shapeA, shapeB, direction));
 
     // Second direction points towards the origin
