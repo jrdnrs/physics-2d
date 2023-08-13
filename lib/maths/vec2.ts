@@ -32,8 +32,16 @@ export default class Vec2 {
         return isNaN(this.x) || isNaN(this.y);
     }
 
+    isZero(): boolean {
+        return this.x === 0 && this.y === 0;
+    }
+
     equals(v: Vec2): boolean {
         return this.x === v.x && this.y === v.y;
+    }
+
+    nearEquals(v: Vec2, epsilon: number): boolean {
+        return Math.abs(this.x - v.x) < epsilon && Math.abs(this.y - v.y) < epsilon;
     }
 
     /**
