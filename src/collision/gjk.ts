@@ -212,12 +212,12 @@ export function getContactPoints(edgeA: Segment, edgeB: Segment, normal: Vec2): 
 
     incident.clip(reference.p1, clipDirection);
     if (incident.isNaN()) {
-        return [];
+        return points;
     }
 
     incident.clip(reference.p2, clipDirection.neg());
     if (incident.isNaN()) {
-        return [];
+        return points;
     }
 
     // Now we clip against the reference edge itself. However, we are actually going to
@@ -226,13 +226,16 @@ export function getContactPoints(edgeA: Segment, edgeB: Segment, normal: Vec2): 
     const D = normal.dot(
         reference.p1.magnitudeSquared() >= reference.p2.magnitudeSquared() ? reference.p1 : reference.p2
     );
-    const d1 = normal.dot(incident.p1) - D;
-    const d2 = normal.dot(incident.p2) - D;
 
-    if (d1 >= 0) points.push(incident.p1);
-    // Make sure not to add the same point twice
-    if (!incident.p1.equals(incident.p2) && d2 >= 0) {
-        points.push(incident.p2);
+    if (incident.p1.nearEquals(incident.p2, 1)) {
+        const average = new Vec2(incident.p1.x + incident.p2.x, incident.p1.y + incident.p2.y).mulScalar(0.5);
+        const d = normal.dot(average) - D;
+        if (d >= 0) points.push(average);
+    } else {
+        const d1 = normal.dot(incident.p1) - D;
+        const d2 = normal.dot(incident.p2) - D;
+        if (d1 >= 0) points.push(incident.p1);
+        if (d2 >= 0) points.push(incident.p2);
     }
 
     return points;
