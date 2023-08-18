@@ -155,7 +155,8 @@ export function EPA(shapeA: Shape, shapeB: Shape, simplex: MinkowskiDiff[]): Epa
             if (normal.isZero()) normal = Vec2.perpendicular(ab);
             normal.normalise();
 
-            const distance = normal.dot(a);
+            // This can sometimes be negative due to floating point errors, so we clamp it
+            const distance = Math.max(0, normal.dot(a));
 
             if (distance < minDistance) {
                 minIndexA = i;
