@@ -72,6 +72,7 @@ export class Circle implements Shape {
     }
 
     getFurthestPoint(direction: Vec2): Vec2 {
-        return Vec2.add(this.centre, Vec2.mulScalar(direction, this.radius));
+        const normalised = direction.normalise();
+        return Vec2.add(this.centre, Vec2.mulScalar(normalised, this.radius));
     }
 }

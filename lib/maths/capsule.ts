@@ -39,12 +39,14 @@ export class Capsule implements Shape {
     }
 
     getFurthestPoint(direction: Vec2): Vec2 {
+        const normalised = direction.normalise();
+
         // Start at one of the circle's centre points, and add radius in the given direction.
         return Vec2.add(
             Vec2.dot(direction, Vec2.sub(this.circles[1].centre, this.circles[0].centre)) >= 0
                 ? this.circles[1].centre
                 : this.circles[0].centre,
-            Vec2.mulScalar(direction, this.circles[0].radius)
+            Vec2.mulScalar(normalised, this.circles[0].radius)
         );
     }
 

@@ -15,12 +15,13 @@ export function GJK(shapeA: Shape, shapeB: Shape): GjkResult {
     const simplex: MinkowskiDiff[] = [];
 
     // First direction points from poly1 to poly2
-    let direction = Vec2.sub(shapeA.getCentre(), shapeB.getCentre()).normalise();
+    let direction = Vec2.sub(shapeA.getCentre(), shapeB.getCentre());
+    // ...Unless they are on top of each other, in which case we just use the x-axis
     if (direction.isZero()) direction.x = 1;
     simplex.push(new MinkowskiDiff(shapeA, shapeB, direction));
 
     // Second direction points towards the origin
-    direction = Vec2.neg(simplex[0].result).normalise();
+    direction = Vec2.neg(simplex[0].result);
 
     while (true) {
         const point = new MinkowskiDiff(shapeA, shapeB, direction);
@@ -64,12 +65,9 @@ function checkSimplexLine(simplex: MinkowskiDiff[], direction: Vec2): boolean {
 
     // The normal is the vector perpendicular to the edge, pointing towards the origin
     let normal = Vec2.tripleCross(ab, ao, ab);
-    if (normal.isZero()) {
-        // The origin is on the line, so we can't use the triple cross product
-        // to find the normal. Instead, we just use the perpendicular of the edge.
-        normal = Vec2.perpendicular(ab);
-    }
-    normal.normalise();
+    // `tripleCross` can return a zero vector if the origin is on the edge, so we default
+    // to the perpendicular vector
+    if (normal.isZero()) normal = Vec2.perpendicular(ab);
 
     direction.set(normal);
     return false;
@@ -101,7 +99,7 @@ function checkSimplexTriangle(simplex: MinkowskiDiff[], direction: Vec2): boolea
     // If the origin is in the region AB/AC, we should remove C/B from the simplex,
     // and continue searching for support points in the direction of the normal.
 
-    const abNormal = Vec2.tripleCross(ac, ab, ab).normalise();
+    const abNormal = Vec2.tripleCross(ac, ab, ab);
     if (abNormal.dot(ao) > 0) {
         // simplex.splice(0, 1);
         simplex[0] = simplex[1];
@@ -112,7 +110,7 @@ function checkSimplexTriangle(simplex: MinkowskiDiff[], direction: Vec2): boolea
         return false;
     }
 
-    const acNormal = Vec2.tripleCross(ab, ac, ac).normalise();
+    const acNormal = Vec2.tripleCross(ab, ac, ac);
     if (acNormal.dot(ao) > 0) {
         // simplex.splice(1, 1);
         simplex[1] = simplex[2];
@@ -130,7 +128,7 @@ function checkSimplexTriangle(simplex: MinkowskiDiff[], direction: Vec2): boolea
  * EPA (Expanding Polytope Algorithm) is used to find the collision normal and penetration depth
  * of two polygons that are known to be colliding.
  *
- * It works by iteratively expandining the simplex in the direction of the current closest edge
+ * It works by iteratively expanding the simplex in the direction of the current closest edge
  * to the origin, until that edge is found to be on the boundary of the Minkowski difference, which
  * means it truly is the closest edge to the origin.
  */
