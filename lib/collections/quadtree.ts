@@ -1,4 +1,5 @@
 import { AABB } from "../maths/aabb";
+import { swapRemove } from "../util";
 
 const MAX_DEPTH = 4;
 
@@ -162,10 +163,3 @@ export class QuadTree<T extends Item> {
     }
 }
 
-/**
- * Swaps the item at the given index with the last item in the array and returns the last item.
- */
-function swapRemove<T>(array: T[], index: number): T | undefined {
-    [array[index], array[array.length - 1]] = [array[array.length - 1], array[index]];
-    return array.pop();
-}
