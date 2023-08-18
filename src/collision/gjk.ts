@@ -176,11 +176,30 @@ export function EPA(shapeA: Shape, shapeB: Shape, simplex: MinkowskiDiff[]): Epa
         const point = new MinkowskiDiff(shapeA, shapeB, minNormal);
         const distance = minNormal.dot(point.result);
 
-        if (distance - minDistance < 0.001) {
-            let featureA = new Segment(simplex[minIndexA].a, simplex[minIndexB].a);
-            let featureB = new Segment(simplex[minIndexA].b, simplex[minIndexB].b);
-            
-            return new EpaResult(minNormal, distance, featureA, featureB);
+        if (Math.abs(distance - minDistance) < 1e-3) {
+            const mtv = Vec2.mulScalar(minNormal, distance);
+
+            let contactA;
+            if (Vec2.sub(simplex[minIndexB].a, simplex[minIndexA].a).magnitudeSquared() < 1e-3) {
+                contactA = simplex[minIndexA].a;
+            } else {
+                // Project origin onto edge (using first support point), and compare length to edge length
+                // to get interpolation factor
+                const edge = Vec2.sub(simplex[minIndexB].result, simplex[minIndexA].result);
+                const t = -simplex[minIndexA].result.dot(edge) / edge.magnitudeSquared();
+
+                contactA = Vec2.add(simplex[minIndexA].a, edge.mulScalar(t));
+            }
+
+            const contactB = Vec2.sub(contactA, mtv);
+
+            // const contactPoints = getContactPoints(
+            //     new Segment(simplex[minIndexA].a.clone(), simplex[minIndexB].a.clone()),
+            //     new Segment(simplex[minIndexA].b.clone(), simplex[minIndexB].b.clone()),
+            //     minNormal
+            // );
+
+            return new EpaResult(minNormal, mtv, distance, contactA, contactB);
         }
 
         // If the point is not on the edge, we need to insert it into the simplex to expand
@@ -254,15 +273,17 @@ export class MinkowskiDiff {
 
 export class EpaResult {
     readonly normal: Vec2;
+    readonly mtv: Vec2;
     readonly depth: number;
-    readonly closestEdgeA: Segment;
-    readonly closestEdgeB: Segment;
+    readonly worldContactA: Vec2;
+    readonly worldContactB: Vec2;
 
-    constructor(normal: Vec2, depth: number, closestEdgeA: Segment, closestEdgeB: Segment) {
+    constructor(normal: Vec2, mtv: Vec2, depth: number, worldContactA: Vec2, worldContactB: Vec2) {
         this.normal = normal;
+        this.mtv = mtv;
         this.depth = depth;
-        this.closestEdgeA = closestEdgeA;
-        this.closestEdgeB = closestEdgeB;
+        this.worldContactA = worldContactA;
+        this.worldContactB = worldContactB;
     }
 }
 
