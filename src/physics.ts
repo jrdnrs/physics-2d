@@ -99,11 +99,9 @@ export class PhysicsEngine {
             collision.applyAccumulatedImpulses();
         }
 
-        for (let i = 0; i < 1; i++) {
+        for (let i = 0; i < 5; i++) {
             for (const collision of this.collisions.values()) {
-                let restitution = collision.restitution;
-                if (i > 0) restitution = 0;
-                collision.solveVelocity(restitution);
+                collision.solveVelocity();
             }
         }
     }
@@ -209,29 +207,16 @@ export class PhysicsEngine {
         if (!gjkResult.collision) return undefined;
 
         const epaResult = EPA(colliderA, colliderB, gjkResult.simplex!);
+        const newContactPoint = new Contact(
+            bodyA,
+            bodyB,
+            epaResult.worldContactA,
+            epaResult.worldContactB,
+            epaResult.normal,
+            epaResult.tangent
+        );
 
-        // const contactPoints = getContactPoints(epaResult.closestEdgeA, epaResult.closestEdgeB, epaResult.normal);
-        // if (contactPoints.length === 0) return undefined;
-
-        // testing averaging contact points
-        // if (contactPoints.length > 1) {
-        //     const average = Vec2.zero();
-        //     for (const contact of contactPoints) {
-        //         average.add(contact);
-        //     }
-        //     average.divScalar(contactPoints.length);
-        //     contactPoints[0] = average;
-        //     contactPoints.length = 1;
-        // }
-
-        // const manifold = new CollisionManifold(bodyA, bodyB, epaResult.normal, epaResult.depth, contactPoints);
-        const manifold: CollisionManifold = {
-            normal: epaResult.normal,
-            tangent: Vec2.perpendicular(epaResult.normal),
-            depth: epaResult.depth,
-            mtv: epaResult.mtv,
-            contacts: [new Contact(bodyA, bodyB, epaResult.worldContactA, epaResult.worldContactB)],
-        };
+        const manifold = new CollisionManifold(epaResult.normal, epaResult.mtv, epaResult.depth, [newContactPoint]);
 
         const collision = new Collision(bodyA, bodyB, manifold);
 

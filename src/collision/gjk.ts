@@ -180,7 +180,7 @@ export function EPA(shapeA: Shape, shapeB: Shape, simplex: MinkowskiDiff[]): Epa
             const mtv = Vec2.mulScalar(minNormal, distance);
 
             let contactA;
-            if (Vec2.sub(simplex[minIndexB].a, simplex[minIndexA].a).magnitudeSquared() < 1e-3) {
+            if (Vec2.sub(simplex[minIndexB].a, simplex[minIndexA].a).magnitudeSquared() < 1) {
                 contactA = simplex[minIndexA].a;
             } else {
                 // Project origin onto edge (using first support point), and compare length to edge length
@@ -273,6 +273,7 @@ export class MinkowskiDiff {
 
 export class EpaResult {
     readonly normal: Vec2;
+    readonly tangent: Vec2;
     readonly mtv: Vec2;
     readonly depth: number;
     readonly worldContactA: Vec2;
@@ -280,6 +281,7 @@ export class EpaResult {
 
     constructor(normal: Vec2, mtv: Vec2, depth: number, worldContactA: Vec2, worldContactB: Vec2) {
         this.normal = normal;
+        this.tangent = Vec2.perpendicular(normal);
         this.mtv = mtv;
         this.depth = depth;
         this.worldContactA = worldContactA;

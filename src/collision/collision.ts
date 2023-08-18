@@ -98,10 +98,9 @@ export class Collision {
         }
     }
 
-    solveVelocity(restitution: number) {
+    solveVelocity() {
         // Normal Impulse
-        for (let i = 0; i < this.manifold.contacts.length; i++) {
-            const contact = this.manifold.contacts[i];
+        for (const contact of this.manifold.contacts) {
             const relativeVelocity = this.bodyB
                 .getVelocityAtPoint(contact.localPosB)
                 .sub(this.bodyA.getVelocityAtPoint(contact.localPosA));
@@ -109,15 +108,9 @@ export class Collision {
             const relativeVelocityDotNormal = Vec2.dot(relativeVelocity, this.manifold.normal);
             // if (relativeVelocityDotNormal > 0.001) continue; // already separating
 
-            const effectiveMassNormal =
-                this.bodyA.inverseMass +
-                this.bodyB.inverseMass +
-                this.bodyA.inverseAngularMass * Vec2.cross(contact.localPosA, this.manifold.normal) ** 2 +
-                this.bodyB.inverseAngularMass * Vec2.cross(contact.localPosB, this.manifold.normal) ** 2;
-
-            const proportion = 1 / effectiveMassNormal;
-
-            const impulseMagnitude = -(1 + restitution) * relativeVelocityDotNormal * proportion;
+            // const impulseMagnitude = -(1 + restitution) * relativeVelocityDotNormal * contact.effectiveMassNormal;
+            const impulseMagnitude =
+                -(relativeVelocityDotNormal - contact.normalVelocityBias) * contact.effectiveMassNormal;
 
             const newAccumulatedMagnitude = Math.max(contact.accumulatedNormalMagnitude + impulseMagnitude, 0);
             const newImpulse = newAccumulatedMagnitude - contact.accumulatedNormalMagnitude;
@@ -128,31 +121,15 @@ export class Collision {
         }
 
         // Tangent Impulse
-        for (let i = 0; i < this.manifold.contacts.length; i++) {
-            const contact = this.manifold.contacts[i];
+        for (const contact of this.manifold.contacts) {
             const relativeVelocity = this.bodyB
                 .getVelocityAtPoint(contact.localPosB)
                 .sub(this.bodyA.getVelocityAtPoint(contact.localPosA));
 
-            const relativeVelocityDotNormal = Vec2.dot(relativeVelocity, this.manifold.normal);
-
-            // Perpendicular to normal in the direction of relative velocity
-            // const tangent = Vec2.sub(
-            //     relativeVelocity,
-            //     Vec2.mulScalar(this.manifold.normal, relativeVelocityDotNormal)
-            // ).normalise();
             const relativeVelocityDotTangent = Vec2.dot(relativeVelocity, this.manifold.tangent);
             // if (Math.abs(relativeVelocityDotTangent) < 0.001) continue;
 
-            const effectiveMassTangent =
-                this.bodyA.inverseMass +
-                this.bodyB.inverseMass +
-                this.bodyA.inverseAngularMass * Vec2.cross(contact.localPosA, this.manifold.tangent) ** 2 +
-                this.bodyB.inverseAngularMass * Vec2.cross(contact.localPosB, this.manifold.tangent) ** 2;
-
-            const proportion = 1 / effectiveMassTangent;
-
-            const impulseMagnitude = -relativeVelocityDotTangent * proportion;
+            const impulseMagnitude = -relativeVelocityDotTangent * contact.effectiveMassTangent;
 
             const staticFrictionLimit = contact.accumulatedNormalMagnitude * this.friction;
 
@@ -177,12 +154,12 @@ export class CollisionManifold {
     mtv: Vec2;
     contacts: Contact[];
 
-    constructor(bodyA: RigidBody, bodyB: RigidBody, normal: Vec2, depth: number, contacts: Vec2[]) {
+    constructor(normal: Vec2, mtv: Vec2, depth: number, contacts: Contact[]) {
         this.normal = normal;
         this.tangent = Vec2.perpendicular(normal);
         this.depth = depth;
-        this.mtv = Vec2.mulScalar(normal, depth);
-        this.contacts = contacts.map((contact) => new Contact(bodyA, bodyB, contact, this.mtv));
+        this.mtv = mtv;
+        this.contacts = contacts;
     }
 }
 
@@ -191,16 +168,46 @@ export class Contact {
     readonly worldPosB: Vec2;
     readonly localPosA: Vec2;
     readonly localPosB: Vec2;
+    readonly effectiveMassNormal: number;
+    readonly effectiveMassTangent: number;
+    readonly normalVelocityBias: number;
 
     accumulatedNormalMagnitude: number;
     accumulatedTangentMagnitude: number;
 
-    constructor(bodyA: RigidBody, bodyB: RigidBody, worldPosA: Vec2, worldPosB: Vec2) {
+    constructor(bodyA: RigidBody, bodyB: RigidBody, worldPosA: Vec2, worldPosB: Vec2, normal: Vec2, tangent: Vec2) {
         this.worldPosA = worldPosA;
         this.worldPosB = worldPosB;
         this.localPosA = Vec2.sub(worldPosA, bodyA.position);
         this.localPosB = Vec2.sub(worldPosB, bodyB.position);
         this.accumulatedNormalMagnitude = 0;
         this.accumulatedTangentMagnitude = 0;
+
+        // For iterative solvers, repeated application of restitution loss can cause excessive loss of energy.
+        // Thus, we need to store the original restitution loss and just use it to bias future calculations.
+        this.normalVelocityBias = 0;
+        const relativeVelocity = bodyB.getVelocityAtPoint(this.localPosB).sub(bodyA.getVelocityAtPoint(this.localPosA));
+        const relativeVelocityDotNormal = Vec2.dot(relativeVelocity, normal);
+        if (relativeVelocityDotNormal < 0) {
+            this.normalVelocityBias = -(bodyA.restitution * bodyB.restitution) * relativeVelocityDotNormal;
+        }
+
+        const radiusNormalA = Vec2.cross(this.localPosA, normal);
+        const radiusNormalB = Vec2.cross(this.localPosB, normal);
+        this.effectiveMassNormal =
+            1 /
+            (bodyA.inverseMass +
+                bodyB.inverseMass +
+                bodyA.inverseAngularMass * radiusNormalA * radiusNormalA +
+                bodyB.inverseAngularMass * radiusNormalB * radiusNormalB);
+
+        const radiusTangentA = Vec2.cross(this.localPosA, tangent);
+        const radiusTangentB = Vec2.cross(this.localPosB, tangent);
+        this.effectiveMassTangent =
+            1 /
+            (bodyA.inverseMass +
+                bodyB.inverseMass +
+                bodyA.inverseAngularMass * radiusTangentA * radiusTangentA +
+                bodyB.inverseAngularMass * radiusTangentB * radiusTangentB);
     }
 }
