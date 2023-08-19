@@ -97,6 +97,10 @@ export class PhysicsEngine {
         for (const collision of this.collisions.values()) {
             collision.solvePositionLinearOnly();
             collision.applyAccumulatedImpulses();
+
+            for (const contact of collision.manifold.contacts) {
+                contact.updateRestitutionBias(collision.bodyA, collision.bodyB, collision.manifold.normal);
+            }
         }
 
         for (let i = 0; i < 5; i++) {

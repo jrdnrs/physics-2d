@@ -108,9 +108,9 @@ export class Collision {
             const relativeVelocityDotNormal = Vec2.dot(relativeVelocity, this.manifold.normal);
             // if (relativeVelocityDotNormal > 0.001) continue; // already separating
 
-            // const impulseMagnitude = -(1 + restitution) * relativeVelocityDotNormal * contact.effectiveMassNormal;
+            // const oldimpulseMagnitude = -(1 + this.restitution) * relativeVelocityDotNormal * contact.effectiveMassNormal;
             const impulseMagnitude =
-                -(relativeVelocityDotNormal - contact.normalVelocityBias) * contact.effectiveMassNormal;
+                -(relativeVelocityDotNormal - contact.originalRestitutionBias) * contact.effectiveMassNormal;
 
             const newAccumulatedMagnitude = Math.max(contact.accumulatedNormalMagnitude + impulseMagnitude, 0);
             const newImpulse = newAccumulatedMagnitude - contact.accumulatedNormalMagnitude;
@@ -170,8 +170,8 @@ export class Contact {
     readonly localPosB: Vec2;
     readonly effectiveMassNormal: number;
     readonly effectiveMassTangent: number;
-    readonly normalVelocityBias: number;
 
+    originalRestitutionBias: number;
     accumulatedNormalMagnitude: number;
     accumulatedTangentMagnitude: number;
 
@@ -182,15 +182,11 @@ export class Contact {
         this.localPosB = Vec2.sub(worldPosB, bodyB.position);
         this.accumulatedNormalMagnitude = 0;
         this.accumulatedTangentMagnitude = 0;
+        this.originalRestitutionBias = 0;
 
         // For iterative solvers, repeated application of restitution loss can cause excessive loss of energy.
         // Thus, we need to store the original restitution loss and just use it to bias future calculations.
-        this.normalVelocityBias = 0;
-        const relativeVelocity = bodyB.getVelocityAtPoint(this.localPosB).sub(bodyA.getVelocityAtPoint(this.localPosA));
-        const relativeVelocityDotNormal = Vec2.dot(relativeVelocity, normal);
-        if (relativeVelocityDotNormal < 0) {
-            this.normalVelocityBias = -(bodyA.restitution * bodyB.restitution) * relativeVelocityDotNormal;
-        }
+        this.updateRestitutionBias(bodyA, bodyB, normal);
 
         const radiusNormalA = Vec2.cross(this.localPosA, normal);
         const radiusNormalB = Vec2.cross(this.localPosB, normal);
@@ -209,5 +205,16 @@ export class Contact {
                 bodyB.inverseMass +
                 bodyA.inverseAngularMass * radiusTangentA * radiusTangentA +
                 bodyB.inverseAngularMass * radiusTangentB * radiusTangentB);
+    }
+
+    updateRestitutionBias(bodyA: RigidBody, bodyB: RigidBody, normal: Vec2) {
+        const relativeVelocity = bodyB.getVelocityAtPoint(this.localPosB).sub(bodyA.getVelocityAtPoint(this.localPosA));
+        const relativeVelocityDotNormal = Vec2.dot(relativeVelocity, normal);
+        if (relativeVelocityDotNormal < -0.1) {
+            // Only apply bias if objects are moving towards each other
+            this.originalRestitutionBias = -(bodyA.restitution * bodyB.restitution) * relativeVelocityDotNormal;
+        } else {
+            this.originalRestitutionBias = 0;
+        }
     }
 }
