@@ -35,7 +35,7 @@ export class Collision {
     solvePositionLinearOnly() {
         const effectiveMass = 1 / (this.bodyA.inverseMass + this.bodyB.inverseMass);
 
-        const correction = Vec2.mulScalar(this.manifold.normal, Math.max(0, this.manifold.depth - 0.01));
+        const correction = Vec2.mulScalar(this.manifold.normal, Math.max(0, this.manifold.depth - 0.1));
 
         this.bodyA.translate(Vec2.mulScalar(correction, -effectiveMass * this.bodyA.inverseMass));
         this.bodyB.translate(Vec2.mulScalar(correction, effectiveMass * this.bodyB.inverseMass));
@@ -87,7 +87,7 @@ export class Collision {
                 this.bodyA.inverseAngularMass * Vec2.cross(contact.localPosA, this.manifold.normal) ** 2 +
                 this.bodyB.inverseAngularMass * Vec2.cross(contact.localPosB, this.manifold.normal) ** 2;
 
-            const correctionMagnitude = Math.max(0, this.manifold.depth - 0.01) / effectiveMassNormal;
+            const correctionMagnitude = Math.max(0, this.manifold.depth - 0.1) / effectiveMassNormal;
             const correction = Vec2.mulScalar(this.manifold.normal, correctionMagnitude);
 
             this.bodyA.translate(Vec2.mulScalar(correction, -this.bodyA.inverseMass));
@@ -108,7 +108,7 @@ export class Collision {
             const relativeVelocityDotNormal = Vec2.dot(relativeVelocity, this.manifold.normal);
             // if (relativeVelocityDotNormal > 0.001) continue; // already separating
 
-            // const oldimpulseMagnitude = -(1 + this.restitution) * relativeVelocityDotNormal * contact.effectiveMassNormal;
+            // const impulseMagnitude = -(1 + this.restitution) * relativeVelocityDotNormal * contact.effectiveMassNormal;
             const impulseMagnitude =
                 -(relativeVelocityDotNormal - contact.originalRestitutionBias) * contact.effectiveMassNormal;
 

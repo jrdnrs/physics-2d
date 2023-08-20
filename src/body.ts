@@ -4,23 +4,19 @@ import { Circle } from "../lib/maths/circle";
 import { Mat2 } from "../lib/maths/mat2";
 import { Polygon } from "../lib/maths/poly";
 import { Shape } from "../lib/maths/shape";
-import { RECIP_12, RECIP_4, PI, RECIP_2, RECIP_36, lerp, average } from "../lib/maths/util";
+import { RECIP_12, RECIP_4, PI, RECIP_2, RECIP_36 } from "../lib/maths/util";
 import Vec2 from "../lib/maths/vec2";
-import { PhysicsEngine } from "./physics";
+import { Island } from "./island";
 
 export class RigidBody {
     static nextID = 0;
     readonly id: number;
 
-    // testing
-    movements: Vec2[];
-    rotations: number[];
-    movementIndex: number;
-
     // state
-    sleepCounter: number;
-    asleep: boolean;
+    timeStill: number;
+    sleeping: boolean;
     fixed: boolean;
+    island: Island | undefined;
 
     // shape
     collider: Shape;
@@ -54,12 +50,10 @@ export class RigidBody {
         fixed: boolean
     ) {
         this.id = RigidBody.nextID++;
-        this.movements = new Array(PhysicsEngine.stepsPerSecond).fill(Vec2.zero());
-        this.rotations = new Array(PhysicsEngine.stepsPerSecond).fill(0);
-        this.movementIndex = 0;
-        this.sleepCounter = 0;
-        this.asleep = false;
+        this.timeStill = 0;
+        this.sleeping = false;
         this.fixed = fixed;
+        this.island = undefined;
         this.collider = collider.setCentre(position);
         this.bounds = AABB.fromShape(collider);
         this.position = position;
@@ -196,54 +190,19 @@ export class RigidBody {
         const linearDelta = Vec2.mulScalar(impulse, this.inverseMass);
         const angularDelta = radius.cross(impulse) * this.inverseAngularMass;
 
-        // if (linearDelta.magnitudeSquared() < 0.01 && Math.abs(angularDelta) < 0.01) return;
-
-        if (this.asleep) {
-            if (linearDelta.magnitude() > 0.1 || Math.abs(angularDelta) > 0.1) {
-                console.log("WAKE UP", linearDelta, angularDelta);
-                this.wakeUp();
-            }
-        }
-
         this.linearVelocity.add(linearDelta);
         this.angularVelocity += angularDelta;
     }
 
-    wakeUp() {
-        this.asleep = false;
-        this.movementIndex = 0;
-        this.movements.fill(Vec2.zero());
-        this.rotations.fill(0);
-    }
-
-    sleep() {
-        const averageMovementVec = Vec2.zero();
-        let averageRotation = 0;
-        for (let i = 0; i < this.movements.length; i++) {
-            averageMovementVec.add(this.movements[i]);
-            averageRotation += this.rotations[i];
-        }
-        averageMovementVec.divScalar(this.movements.length);
-        averageMovementVec.sub(this.position);
-        const averageMovement = averageMovementVec.magnitude();
-        averageRotation /= this.movements.length;
-        averageRotation -= this.rotation;
-
-        console.log(averageMovement, averageRotation);
-
-        if (averageMovement < 1 && Math.abs(averageRotation) < 0.001745) {
-            console.log("resting");
-            this.linearVelocity.x = 0;
-            this.linearVelocity.y = 0;
-            this.angularVelocity = 0;
-
-            this.asleep = true;
+    addToIsland(island: Island) {
+        if (!this.fixed) {
+            this.island = island;
+            island.add(this);
         }
     }
 
-    update(deltaSeconds: number) {
-        if (this.fixed || this.asleep) return;
-
+    integrate(deltaSeconds: number) {
+        if (this.fixed || this.sleeping) return;
 
         this.linearVelocity.add(Vec2.mulScalar(this.linearAcceleration, deltaSeconds));
         const translationDelta = Vec2.mulScalar(this.linearVelocity, deltaSeconds);
@@ -258,22 +217,6 @@ export class RigidBody {
         this.linearVelocity.mulScalar(linearDecay);
         this.angularVelocity *= angularDecay;
 
-        // this.movements[this.movementIndex] = this.position.clone();
-        // this.rotations[this.movementIndex] = this.rotation;
-        // this.movementIndex = (this.movementIndex + 1) % this.movements.length;
-
-        // if (this.movementIndex === this.movements.length - 1) this.sleep();
-
-        // if (this.linearVelocity.magnitudeSquared() < 0.01 ) {
-        //     this.linearVelocity.x = 0;
-        //     this.linearVelocity.y = 0;
-        // }
-
-        // if (Math.abs(this.angularVelocity) < 0.01) {
-        //     this.angularVelocity = 0;
-        // }
-
-     
         this.linearAcceleration.x = 0;
         this.linearAcceleration.y = 0;
         this.angularAcceleration = 0;

@@ -75,6 +75,7 @@ drawer.run((dt) => {
 
     drawer.context.fillText(`Physics steps: ${deltaSteps}`, 10, 40);
     drawer.context.fillText(`Rigid bodies: ${physicsEngine.bodies.length}`, 10, 60);
+    drawer.context.fillText(`Islands: ${physicsEngine.islands.length}`, 10, 80);
 });
 
 function updateInput() {
@@ -92,8 +93,6 @@ function updateInput() {
 
         case KeyState.Held:
             if (held !== undefined) {
-                // held.applyForce(Vec2.sub(mousePos, held.position).mulScalar(held.mass * 10), Vec2.zero());
-                // held.position.add(mouseDelta);
                 held.translate(mouseDelta);
                 physicsEngine.quadtree.update(held);
             }
@@ -162,45 +161,45 @@ function updateInput() {
 function updateDraw() {
     drawer.clear("#eeeeee");
 
-    drawQuadTree(physicsEngine.quadtree.root);
+    // drawQuadTree(physicsEngine.quadtree.root);
 
     for (const body of physicsEngine.bodies) {
-        if (body.asleep) {
+        if (body.sleeping) {
             body.collider.draw(drawer, DARK_BLUE_FILL_STROKE);
         } else {
             body.collider.draw(drawer, BLUE_FILL_STROKE);
             // body.bounds.draw(drawer, RED_STROKE);
-            drawer.drawLine(body.position, Vec2.add(body.position, body.linearVelocity), CYAN_STROKE);
+            // drawer.drawLine(body.position, Vec2.add(body.position, body.linearVelocity), CYAN_STROKE);
         }
     }
     if (held !== undefined) held.collider.draw(drawer, GREEN_FILL);
 
-    for (const collision of physicsEngine.collisions.values()) {
-        const manifold = collision.manifold;
+    // for (const collision of physicsEngine.collisions.values()) {
+    //     const manifold = collision.manifold;
 
-        // draw individual contact points
-        for (const contact of manifold.contacts) {
-            drawer.drawCircle(contact.worldPosA, 3, RED_FILL_STROKE);
-            drawer.drawCircle(Vec2.sub(contact.worldPosA, manifold.mtv), 3, RED_FILL_STROKE);
-        }
+    //     // draw individual contact points
+    //     for (const contact of manifold.contacts) {
+    //         drawer.drawCircle(contact.worldPosA, 3, RED_FILL_STROKE);
+    //         drawer.drawCircle(Vec2.sub(contact.worldPosA, manifold.mtv), 3, RED_FILL_STROKE);
+    //     }
 
-        // draw lines between multiple contacts
-        if (manifold.contacts.length === 2) {
-            drawer.drawLine(manifold.contacts[0].worldPosA, manifold.contacts[1].worldPosA, RED_FILL_STROKE);
-            drawer.drawLine(
-                Vec2.sub(manifold.contacts[0].worldPosA, manifold.mtv),
-                Vec2.sub(manifold.contacts[1].worldPosA, manifold.mtv),
-                RED_FILL_STROKE
-            );
-        }
+    //     // draw lines between multiple contacts
+    //     if (manifold.contacts.length === 2) {
+    //         drawer.drawLine(manifold.contacts[0].worldPosA, manifold.contacts[1].worldPosA, RED_FILL_STROKE);
+    //         drawer.drawLine(
+    //             Vec2.sub(manifold.contacts[0].worldPosA, manifold.mtv),
+    //             Vec2.sub(manifold.contacts[1].worldPosA, manifold.mtv),
+    //             RED_FILL_STROKE
+    //         );
+    //     }
 
-        // draw mtv
-        drawer.drawLine(
-            manifold.contacts[0].worldPosA,
-            Vec2.add(manifold.contacts[0].worldPosA, manifold.mtv),
-            RED_FILL_STROKE
-        );
-    }
+    //     // draw mtv
+    //     drawer.drawLine(
+    //         manifold.contacts[0].worldPosA,
+    //         Vec2.add(manifold.contacts[0].worldPosA, manifold.mtv),
+    //         RED_FILL_STROKE
+    //     );
+    // }
 
     drawer.drawFps(2);
     drawer.drawFrametimeGraph(2);
