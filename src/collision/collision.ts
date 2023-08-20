@@ -41,44 +41,6 @@ export class Collision {
         this.bodyB.translate(Vec2.mulScalar(correction, effectiveMass * this.bodyB.inverseMass));
     }
 
-    solveVelocityLinearOnly() {
-        const relativeVelocity = Vec2.sub(this.bodyB.linearVelocity, this.bodyA.linearVelocity);
-        const relativeVelocityDotNormal = Vec2.dot(relativeVelocity, this.manifold.normal);
-        if (relativeVelocityDotNormal > 0.001) return; // already separating
-
-        const effectiveMass = this.bodyA.inverseMass + this.bodyB.inverseMass;
-
-        const restitution = this.bodyA.restitution * this.bodyB.restitution;
-
-        const normalImpulseMagnitude = (-(1 + restitution) * relativeVelocityDotNormal) / effectiveMass;
-        const normalImpulse = Vec2.mulScalar(this.manifold.normal, normalImpulseMagnitude);
-
-        const tangent = Vec2.sub(
-            relativeVelocity,
-            Vec2.mulScalar(this.manifold.normal, relativeVelocityDotNormal)
-        ).normalise();
-        const relativeVelocityDotTangent = Vec2.dot(relativeVelocity, tangent);
-        // if (Math.abs(relativeVelocityDotTangent) < 0.001) return;
-
-        const tangentImpulseMagnitude = -Math.min(
-            relativeVelocityDotTangent / effectiveMass,
-            normalImpulseMagnitude * this.friction
-        );
-        const tangentImpulse = Vec2.mulScalar(tangent, tangentImpulseMagnitude);
-
-        this.bodyA.applyImpulse(Vec2.neg(normalImpulse));
-        this.bodyB.applyImpulse(normalImpulse);
-
-        console.log(
-            this.bodyB.linearVelocity,
-            relativeVelocity,
-            Vec2.mulScalar(tangentImpulse, this.bodyB.inverseMass)
-        );
-
-        this.bodyA.applyImpulse(Vec2.neg(tangentImpulse));
-        this.bodyB.applyImpulse(tangentImpulse);
-    }
-
     solvePosition() {
         for (const contact of this.manifold.contacts) {
             const effectiveMassNormal =

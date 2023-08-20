@@ -212,6 +212,7 @@ export class RigidBody {
         const rotationDelta = this.angularVelocity * deltaSeconds;
         this.rotate(rotationDelta);
 
+        // TODO: timesteps have fixed length, so this should definitely be a constant
         const linearDecay = Math.exp(-deltaSeconds * this.friction);
         const angularDecay = Math.exp(-deltaSeconds * this.friction);
         this.linearVelocity.mulScalar(linearDecay);

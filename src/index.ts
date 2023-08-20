@@ -18,7 +18,7 @@ import { AABB } from "../lib/maths/aabb";
 import { Polygon } from "../lib/maths/poly";
 import Vec2 from "../lib/maths/vec2";
 import { RigidBody } from "./body";
-import { PhysicsEngine } from "./physics";
+import { PhysicsEngine, PhysicsEngineConfigDefault } from "./physics";
 
 const WIDTH = 1280;
 const HEIGHT = 720;
@@ -56,7 +56,12 @@ const GREEN_FILL_STROKE = drawer.getStyleID(new Style("green", "darkgreen", 2));
 const CYAN_STROKE = drawer.getStyleID(new Style(undefined, "cyan", 1));
 const RED_FILL_STROKE = drawer.getStyleID(new Style("red", "darkred", 2));
 
-const physicsEngine = new PhysicsEngine(AABB.fromDimensions(0, 0, WIDTH, HEIGHT));
+const physicsEngine = new PhysicsEngine(AABB.fromDimensions(0, 0, WIDTH, HEIGHT), {
+    ...PhysicsEngineConfigDefault,
+    gravity: 1500,
+    stepsPerSecond: 240,
+    velocityIterations: 3
+});
 for (const body of rigidBodies) {
     physicsEngine.addBody(body);
 }

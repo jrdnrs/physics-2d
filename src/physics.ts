@@ -8,14 +8,8 @@ import { swapRemove } from "../lib/util";
 import { Island } from "./island";
 
 export class PhysicsEngine {
-    static readonly gravity = 981;
-
-    static readonly stepsPerSecond = 500;
-    static readonly fixedTimeStep = 1 / PhysicsEngine.stepsPerSecond;
-
-    static readonly sleepLinearThreshold = 0.15;
-    static readonly sleepAngularThreshold = 0.15;
-    static readonly sleepTimeThreshold = 0.5;
+    readonly config: PhysicsEngineConfig;
+    readonly fixedTimeStep: number;
 
     timeElapsed: number;
     stepsElapsed: number;
@@ -29,7 +23,10 @@ export class PhysicsEngine {
     collisions: Map<number, Collision>;
     islands: Island[];
 
-    constructor(worldBounds: AABB) {
+    constructor(worldBounds: AABB, config: PhysicsEngineConfig = PhysicsEngineConfigDefault) {
+        this.config = config;
+        this.fixedTimeStep = 1 / config.stepsPerSecond;
+
         this.timeElapsed = 0;
         this.stepsElapsed = 0;
         this.updateDuration = 0;
@@ -57,11 +54,11 @@ export class PhysicsEngine {
     }
 
     update(deltaSeconds: number): number {
-        const deltaSteps = Math.floor(this.timeElapsed / PhysicsEngine.fixedTimeStep) - this.stepsElapsed;
+        const deltaSteps = Math.floor(this.timeElapsed / this.fixedTimeStep) - this.stepsElapsed;
 
         const start = performance.now();
         for (let i = 0; i < deltaSteps; i++) {
-            this.step(PhysicsEngine.fixedTimeStep);
+            this.step(this.fixedTimeStep);
         }
         this.updateDuration = performance.now() - start;
 
@@ -76,7 +73,7 @@ export class PhysicsEngine {
             if (body.fixed || body.sleeping) continue;
 
             // body.applyForce(new Vec2(0, PhysicsEngine.gravity * body.mass), Vec2.zero());
-            body.linearVelocity.y += PhysicsEngine.gravity * deltaSeconds;
+            body.linearVelocity.y += this.config.gravity * deltaSeconds;
             body.integrate(deltaSeconds);
 
             // crude wrap around
@@ -110,8 +107,8 @@ export class PhysicsEngine {
                 const angularMotion = Math.abs(body.angularVelocity);
 
                 if (
-                    linearMotion < PhysicsEngine.sleepLinearThreshold * PhysicsEngine.sleepLinearThreshold &&
-                    angularMotion < PhysicsEngine.sleepAngularThreshold
+                    linearMotion < this.config.sleepLinearThreshold * this.config.sleepLinearThreshold &&
+                    angularMotion < this.config.sleepAngularThreshold
                 ) {
                     body.timeStill += deltaSeconds;
                     minSleepTime = Math.min(minSleepTime, body.timeStill);
@@ -122,7 +119,7 @@ export class PhysicsEngine {
             }
 
             // Put the whole island to sleep if all bodies are still for a while
-            if (minSleepTime >= PhysicsEngine.sleepTimeThreshold) {
+            if (minSleepTime >= this.config.sleepTimeThreshold) {
                 for (const body of island.bodies) {
                     body.sleeping = true;
                 }
@@ -140,7 +137,7 @@ export class PhysicsEngine {
             }
         }
 
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < this.config.velocityIterations; i++) {
             for (const collision of this.collisions.values()) {
                 collision.solveVelocity();
             }
@@ -282,3 +279,21 @@ export class PhysicsEngine {
         return collision;
     }
 }
+
+export type PhysicsEngineConfig = {
+    gravity: number;
+    stepsPerSecond: number;
+    velocityIterations: number;
+    sleepLinearThreshold: number;
+    sleepAngularThreshold: number;
+    sleepTimeThreshold: number;
+};
+
+export const PhysicsEngineConfigDefault: PhysicsEngineConfig = {
+    gravity: 981,
+    stepsPerSecond: 500,
+    velocityIterations: 5,
+    sleepLinearThreshold: 0.15,
+    sleepAngularThreshold: 0.15,
+    sleepTimeThreshold: 0.5,
+};
