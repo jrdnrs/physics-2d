@@ -40,9 +40,7 @@ rigidBodies[1].rotate(0.2);
 rigidBodies[2].rotate(-0.2);
 
 for (let i = 0; i < 0; i++) {
-    rigidBodies.push(
-        RigidBody.fromRect(10, 10, new Vec2(250 + ((i * 33) % 900), ((100 + i * 33) / 900) * 33 + i * 10), 1, 0.9, 0.1)
-    );
+    rigidBodies.push(RigidBody.fromRect(10, 10, new Vec2(Math.random() * WIDTH, Math.random() * HEIGHT), 1, 0.8, 0.3));
 }
 
 let held: RigidBody | undefined = undefined;
@@ -59,8 +57,8 @@ const RED_FILL_STROKE = drawer.getStyleID(new Style("red", "darkred", 2));
 const physicsEngine = new PhysicsEngine(AABB.fromDimensions(0, 0, WIDTH, HEIGHT), {
     ...PhysicsEngineConfigDefault,
     gravity: 1500,
-    stepsPerSecond: 240,
-    velocityIterations: 3
+    stepsPerSecond: 333,
+    velocityIterations: 5,
 });
 for (const body of rigidBodies) {
     physicsEngine.addBody(body);
@@ -80,7 +78,7 @@ drawer.run((dt) => {
 
     drawer.context.fillText(`Physics steps: ${deltaSteps}`, 10, 40);
     drawer.context.fillText(`Rigid bodies: ${physicsEngine.bodies.length}`, 10, 60);
-    drawer.context.fillText(`Islands: ${physicsEngine.islands.length}`, 10, 80);
+    drawer.context.fillText(`Active Islands: ${physicsEngine.islands.length}`, 10, 80);
 });
 
 function updateInput() {
