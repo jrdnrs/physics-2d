@@ -193,12 +193,6 @@ export function EPA(shapeA: Shape, shapeB: Shape, simplex: MinkowskiDiff[]): Epa
 
             const contactB = Vec2.sub(contactA, mtv);
 
-            // const contactPoints = getContactPoints(
-            //     new Segment(simplex[minIndexA].a.clone(), simplex[minIndexB].a.clone()),
-            //     new Segment(simplex[minIndexA].b.clone(), simplex[minIndexB].b.clone()),
-            //     minNormal
-            // );
-
             return new EpaResult(minNormal, mtv, distance, contactA, contactB);
         }
 
@@ -208,55 +202,6 @@ export function EPA(shapeA: Shape, shapeB: Shape, simplex: MinkowskiDiff[]): Epa
     }
 
     throw new Error("EPA failed to converge");
-}
-
-export function getContactPoints(edgeA: Segment, edgeB: Segment, normal: Vec2): Vec2[] {
-    const points: Vec2[] = [];
-
-    let reference = edgeB;
-    let incident = edgeA;
-
-    // We now clip the incident edge twice. Once for the threshold that passes through
-    // the reference edge's first point, and once for the threshold that passes through
-    // the reference edge's second point.
-    //
-    // We also need to check after if the incident edge is completely clipped away,
-    // in which case we can return an empty array, as there are no contact points.
-
-    const refEdge = reference.edge();
-    const clipDirection = new Vec2(-normal.y, normal.x);
-    const check = refEdge.dot(clipDirection);
-    if (check < 0) clipDirection.neg();
-
-    incident.clip(reference.p1, clipDirection);
-    if (incident.isNaN()) {
-        return points;
-    }
-
-    incident.clip(reference.p2, clipDirection.neg());
-    if (incident.isNaN()) {
-        return points;
-    }
-
-    // Now we clip against the reference edge itself. However, we are actually going to
-    // discard points instead of clipping them, as these are now the contact points.
-
-    const D = normal.dot(
-        reference.p1.magnitudeSquared() >= reference.p2.magnitudeSquared() ? reference.p1 : reference.p2
-    );
-
-    if (incident.p1.nearEquals(incident.p2, 1)) {
-        const average = new Vec2(incident.p1.x + incident.p2.x, incident.p1.y + incident.p2.y).mulScalar(0.5);
-        const d = normal.dot(average) - D;
-        if (d >= 0) points.push(average);
-    } else {
-        const d1 = normal.dot(incident.p1) - D;
-        const d2 = normal.dot(incident.p2) - D;
-        if (d1 >= 0) points.push(incident.p1);
-        if (d2 >= 0) points.push(incident.p2);
-    }
-
-    return points;
 }
 
 export class MinkowskiDiff {
