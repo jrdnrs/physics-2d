@@ -24,6 +24,8 @@ export class PhysicsEngine {
     islands: Island[];
 
     constructor(worldBounds: AABB, config: PhysicsEngineConfig = PhysicsEngineConfigDefault) {
+        assert(config.stepsPerSecond > 0, "Steps per second must be greater than 0");
+
         this.config = config;
         this.fixedTimeStep = 1 / config.stepsPerSecond;
 

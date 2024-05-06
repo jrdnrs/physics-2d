@@ -5,3 +5,9 @@ export function swapRemove<T>(array: T[], index: number): T | undefined {
     [array[index], array[array.length - 1]] = [array[array.length - 1], array[index]];
     return array.pop();
 }
+
+export function assert(condition: boolean, message?: string) {
+    if (!condition) {
+        throw new Error(message);
+    }
+}

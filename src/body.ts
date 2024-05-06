@@ -6,16 +6,21 @@ import { Polygon } from "../lib/maths/poly";
 import { Shape } from "../lib/maths/shape";
 import { RECIP_12, RECIP_4, PI, RECIP_2, RECIP_36 } from "../lib/maths/util";
 import Vec2 from "../lib/maths/vec2";
+import { assert } from "../lib/util";
 import { Island } from "./island";
 
 export class RigidBody {
     static nextID = 0;
     readonly id: number;
 
-    // state
+    /** Seconds that this body has been considered still
+    (within engine defined thresholds for linear/angular motion) */
     timeStill: number;
+    /** Whether physics processing is paused */
     sleeping: boolean;
+    /** Whether this body has infinite mass and cannot be moved */
     fixed: boolean;
+    /** If present, the island to which this body belongs */
     island: Island | undefined;
 
     // shape
@@ -49,6 +54,9 @@ export class RigidBody {
         friction: number,
         fixed: boolean
     ) {
+        assert(mass > 0, "Mass must be greater than 0");
+        assert(angularMass > 0, "Angular mass must be greater than 0");
+
         this.id = RigidBody.nextID++;
         this.timeStill = 0;
         this.sleeping = false;
