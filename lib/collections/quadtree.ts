@@ -124,7 +124,7 @@ export class QuadTree<T extends Item> {
     }
 
     insert(item: T): boolean {
-        if (!this.root.bounds.contains(item.bounds)) return false;
+        if (!this.root.bounds.intersects(item.bounds)) return false;
 
         const location = this.root.insert(item);
         this.itemLocations.set(item, location);
