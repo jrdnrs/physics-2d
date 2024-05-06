@@ -1,5 +1,6 @@
 import { clamp } from "../../lib/maths/util";
 import Vec2 from "../../lib/maths/vec2";
+import { swapRemove } from "../../lib/util";
 import { RigidBody } from "../body";
 
 export class Collision {
@@ -70,7 +71,6 @@ export class Collision {
             const relativeVelocityDotNormal = Vec2.dot(relativeVelocity, this.manifold.normal);
             // if (relativeVelocityDotNormal > 0.001) continue; // already separating
 
-            // const impulseMagnitude = -(1 + this.restitution) * relativeVelocityDotNormal * contact.effectiveMassNormal;
             const impulseMagnitude =
                 -(relativeVelocityDotNormal - contact.originalRestitutionBias) * contact.effectiveMassNormal;
 
@@ -105,6 +105,76 @@ export class Collision {
 
             this.bodyA.applyImpulse(Vec2.mulScalar(this.manifold.tangent, -newImpulse), contact.localPosA);
             this.bodyB.applyImpulse(Vec2.mulScalar(this.manifold.tangent, newImpulse), contact.localPosB);
+        }
+    }
+
+    updateContactPoints(newContact: Contact) {
+        // Value is arbitrary, but basically defines how far apart contact points can be before
+        // they are considered different
+        const distanceThreshold = 4;
+
+        // 1. First we should remove any contact points that are found to be invalid
+        for (let i = this.manifold.contacts.length - 1; i >= 0; i--) {
+            const contact = this.manifold.contacts[i];
+
+            const currentWorldPosA = Vec2.add(this.bodyA.position, contact.localPosA);
+            const currentWorldPosB = Vec2.add(this.bodyB.position, contact.localPosB);
+
+            // If the contact points are still overlapping, along the collision normal, bodies
+            // must still be in contact
+            const currentOverlap = Vec2.sub(currentWorldPosB, currentWorldPosA);
+            const inContact = this.manifold.normal.dot(currentOverlap) <= 0.01;
+
+            // If the contact points' position has changed significantly from the initial position,
+            // we should remove them
+            const movementA = Vec2.sub(contact.worldPosA, currentWorldPosA).magnitudeSquared();
+            const movementB = Vec2.sub(contact.worldPosB, currentWorldPosB).magnitudeSquared();
+
+            if (!inContact || movementA > distanceThreshold || movementB > distanceThreshold) {
+                swapRemove(this.manifold.contacts, i);
+            }
+        }
+
+        // 2. Determine whether the new contact point is a duplicate of an existing one
+        let duplicate = false;
+        for (const contact of this.manifold.contacts) {
+            const distanceA = Vec2.sub(newContact.localPosA, contact.localPosA).magnitudeSquared();
+            const distanceB = Vec2.sub(newContact.localPosB, contact.localPosB).magnitudeSquared();
+
+            if (distanceA < distanceThreshold || distanceB < distanceThreshold) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate) this.manifold.contacts.push(newContact);
+
+        // 3. Reduce number of contact points to 2 by selecting the deepest and furthest apart points
+        if (this.manifold.contacts.length > 2) {
+            let deepestContact = this.manifold.contacts[0];
+            let deepestDepth = 0;
+
+            for (const contact of this.manifold.contacts) {
+                const depth = Vec2.sub(contact.worldPosB, contact.worldPosA).magnitudeSquared();
+                if (depth > deepestDepth) {
+                    deepestContact = contact;
+                    deepestDepth = depth;
+                }
+            }
+
+            let furthestContact = this.manifold.contacts[0];
+            let furthestDistance = 0;
+
+            for (const contact of this.manifold.contacts) {
+                const distance = Vec2.sub(contact.worldPosA, deepestContact.worldPosA).magnitudeSquared();
+                if (distance > furthestDistance) {
+                    furthestContact = contact;
+                    furthestDistance = distance;
+                }
+            }
+
+            this.manifold.contacts[0] = deepestContact;
+            this.manifold.contacts[1] = furthestContact;
+            this.manifold.contacts.length = 2;
         }
     }
 }
