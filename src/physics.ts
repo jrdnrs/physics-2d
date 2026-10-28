@@ -1,11 +1,28 @@
-import Vec2 from "../lib/maths/vec2";
 import { QuadTree } from "../lib/collections/quadtree";
 import { AABB } from "../lib/maths/aabb";
 import { RigidBody } from "./body";
 import { Collision, CollisionManifold, Contact } from "./collision/collision";
-import { EPA, GJK, getContactPoints } from "./collision/gjk";
-import { swapRemove } from "../lib/util";
+import { EPA, GJK } from "./collision/gjk";
+import { assert, swapRemove } from "../lib/util";
 import { Island } from "./island";
+
+export type PhysicsEngineConfig = {
+    gravity: number;
+    stepsPerSecond: number;
+    velocityIterations: number;
+    sleepLinearThreshold: number;
+    sleepAngularThreshold: number;
+    sleepTimeThreshold: number;
+};
+
+export const PhysicsEngineConfigDefault: PhysicsEngineConfig = {
+    gravity: 981,
+    stepsPerSecond: 500,
+    velocityIterations: 5,
+    sleepLinearThreshold: 0.15,
+    sleepAngularThreshold: 0.15,
+    sleepTimeThreshold: 0.5,
+};
 
 export class PhysicsEngine {
     readonly config: PhysicsEngineConfig;
@@ -13,13 +30,10 @@ export class PhysicsEngine {
 
     timeElapsed: number;
     stepsElapsed: number;
-    updateDuration: number;
 
     worldBounds: AABB;
-
     quadtree: QuadTree<RigidBody>;
-
-    bodies: RigidBody[] = [];
+    bodies: RigidBody[];
     collisions: Map<number, Collision>;
     islands: Island[];
 
@@ -31,7 +45,6 @@ export class PhysicsEngine {
 
         this.timeElapsed = 0;
         this.stepsElapsed = 0;
-        this.updateDuration = 0;
 
         this.worldBounds = worldBounds;
         this.quadtree = new QuadTree(worldBounds);
@@ -40,29 +53,36 @@ export class PhysicsEngine {
         this.islands = [];
     }
 
+    /** Adds body to the simulation, unless it is out of world bounds */
     addBody(body: RigidBody) {
-        this.bodies.push(body);
-        this.quadtree.insert(body);
+        if (this.quadtree.insert(body)) {
+            this.bodies.push(body);
+        }
     }
 
+    /**
+     * Removes the given body from the simulation
+     *
+     * This uses a swap remove on the internal list of bodies, so don't rely on the order of bodies!
+     */
     removeBody(body: RigidBody) {
         const index = this.bodies.indexOf(body);
-        [this.bodies[index], this.bodies[this.bodies.length - 1]] = [
-            this.bodies[this.bodies.length - 1],
-            this.bodies[index],
-        ];
-        this.bodies.pop();
+        if (index === -1) return;
+
+        swapRemove(this.bodies, index);
         this.quadtree.remove(body);
     }
 
+    /**
+     * Updates the simulation by the given time step in seconds, and returns the number of actual
+     * fixed steps that were taken
+     */
     update(deltaSeconds: number): number {
         const deltaSteps = Math.floor(this.timeElapsed / this.fixedTimeStep) - this.stepsElapsed;
 
-        const start = performance.now();
         for (let i = 0; i < deltaSteps; i++) {
             this.step(this.fixedTimeStep);
         }
-        this.updateDuration = performance.now() - start;
 
         this.timeElapsed += deltaSeconds;
         this.stepsElapsed += deltaSteps;
@@ -70,41 +90,27 @@ export class PhysicsEngine {
         return deltaSteps;
     }
 
-    step(deltaSeconds: number) {
-        for (const body of this.bodies) {
+    private updateMotion(deltaSeconds: number) {
+        for (let i = this.bodies.length - 1; i >= 0; i--) {
+            const body = this.bodies[i];
+
             if (body.fixed || body.sleeping) continue;
 
-            // body.applyForce(new Vec2(0, PhysicsEngine.gravity * body.mass), Vec2.zero());
             body.linearVelocity.y += this.config.gravity * deltaSeconds;
             body.integrate(deltaSeconds);
 
-            // crude wrap around
-            const wrap = new Vec2(0, 0);
-            if (body.bounds.min.x > this.worldBounds.max.x) wrap.x = -body.bounds.max.x;
-            if (body.bounds.min.y > this.worldBounds.max.y) wrap.y = -body.bounds.max.y;
-            if (body.bounds.max.x < 0) wrap.x = this.worldBounds.max.x - body.bounds.min.x;
-            if (body.bounds.max.y < 0) wrap.y = this.worldBounds.max.y - body.bounds.min.y;
-            body.translate(wrap);
-
             if (body.linearVelocity.magnitudeSquared() > 0 || Math.abs(body.angularVelocity) > 0) {
-                this.quadtree.update(body);
+                const inBounds = this.quadtree.update(body);
+                if (!inBounds) swapRemove(this.bodies, i);
             }
         }
+    }
 
-        for (const body of this.bodies) {
-            body.island = undefined;
-        }
-        this.islands.length = 0;
-
-        this.checkCollisions();
-        this.resolveCollisions();
-
+    private updateIslands(deltaSeconds: number) {
         for (const island of this.islands) {
             let minSleepTime = Number.MAX_VALUE;
 
             for (const body of island.bodies) {
-                // if (body.fixed || body.sleeping) continue;
-
                 const linearMotion = body.linearVelocity.magnitudeSquared();
                 const angularMotion = Math.abs(body.angularVelocity);
 
@@ -129,7 +135,41 @@ export class PhysicsEngine {
         }
     }
 
-    resolveCollisions() {
+    private clearIslands() {
+        for (const body of this.bodies) {
+            body.island = undefined;
+        }
+        this.islands.length = 0;
+    }
+
+    private assignIsland(bodyA: RigidBody, bodyB: RigidBody) {
+        if (bodyA.island !== undefined && bodyB.island !== undefined) {
+            if (bodyA.island !== bodyB.island) {
+                bodyA.island.merge(bodyB.island);
+            }
+        } else if (bodyA.island !== undefined) {
+            bodyB.addToIsland(bodyA.island);
+        } else if (bodyB.island !== undefined) {
+            bodyA.addToIsland(bodyB.island);
+        } else {
+            const newIsland = new Island();
+            bodyA.addToIsland(newIsland);
+            bodyB.addToIsland(newIsland);
+            this.islands.push(newIsland);
+        }
+    }
+
+    private step(deltaSeconds: number) {
+        this.updateMotion(deltaSeconds);
+
+        this.clearIslands();
+        this.checkCollisions();
+        this.resolveCollisions();
+
+        this.updateIslands(deltaSeconds);
+    }
+
+    private resolveCollisions() {
         for (const collision of this.collisions.values()) {
             collision.solvePositionLinearOnly();
             collision.applyAccumulatedImpulses();
@@ -146,14 +186,16 @@ export class PhysicsEngine {
         }
     }
 
-    checkCollisions() {
-        const resolvedCollisionIds = Array.from(this.collisions.keys());
+    private checkCollisions() {
+        const existingCollisionIds = Array.from(this.collisions.keys());
 
         for (const bodyA of this.bodies) {
             for (const bodyB of this.quadtree.get(bodyA.bounds)) {
+                // If both bodies are fixed or sleeping, no need to check for collisions
                 if (((bodyA.fixed || bodyA.sleeping) && (bodyB.fixed || bodyB.sleeping)) || bodyB.id <= bodyA.id)
                     continue;
 
+                // If collision is no longer valid, no need to resolve
                 const collision = this.checkCollision(bodyA, bodyB);
                 if (collision === undefined) continue;
 
@@ -161,103 +203,29 @@ export class PhysicsEngine {
                 bodyA.sleeping = false;
                 bodyB.sleeping = false;
 
-                if (bodyA.island !== undefined && bodyB.island !== undefined) {
-                    if (bodyA.island !== bodyB.island) {
-                        bodyA.island.merge(bodyB.island);
-                    }
-                } else if (bodyA.island !== undefined) {
-                    bodyB.addToIsland(bodyA.island);
-                } else if (bodyB.island !== undefined) {
-                    bodyA.addToIsland(bodyB.island);
-                } else {
-                    const newIsland = new Island();
-                    bodyA.addToIsland(newIsland);
-                    bodyB.addToIsland(newIsland);
-                    this.islands.push(newIsland);
-                }
+                this.assignIsland(bodyA, bodyB);
 
                 const existingCollision = this.collisions.get(collision.id);
                 if (existingCollision !== undefined) {
-                    swapRemove(resolvedCollisionIds, resolvedCollisionIds.indexOf(collision.id));
+                    swapRemove(existingCollisionIds, existingCollisionIds.indexOf(collision.id));
 
                     const newContact = collision.manifold.contacts[0];
                     collision.manifold.contacts = existingCollision.manifold.contacts;
 
-                    // remove invalid points
-                    for (let i = collision.manifold.contacts.length - 1; i >= 0; i--) {
-                        const contact = collision.manifold.contacts[i];
-
-                        const currentWorldPosA = Vec2.add(bodyA.position, contact.localPosA);
-                        const currentWorldPosB = Vec2.add(bodyB.position, contact.localPosB);
-
-                        const currentOverlap = Vec2.sub(currentWorldPosB, currentWorldPosA);
-                        const movementA = Vec2.sub(contact.worldPosA, currentWorldPosA).magnitudeSquared();
-                        const movementB = Vec2.sub(contact.worldPosB, currentWorldPosB).magnitudeSquared();
-
-                        const inContact = collision.manifold.normal.dot(currentOverlap) <= 0.01;
-
-                        if (!inContact || movementA > 4 || movementB > 4) {
-                            swapRemove(collision.manifold.contacts, i);
-                        }
-                    }
-
-                    let duplicate = false;
-                    // add new point
-                    for (const contact of collision.manifold.contacts) {
-                        const distanceA = Vec2.sub(newContact.localPosA, contact.localPosA).magnitudeSquared();
-                        const distanceB = Vec2.sub(newContact.localPosB, contact.localPosB).magnitudeSquared();
-
-                        if (distanceA < 4 || distanceB < 4) {
-                            duplicate = true;
-                            break;
-                        }
-                    }
-
-                    if (!duplicate) {
-                        collision.manifold.contacts.push(newContact);
-                    }
-
-                    // reduce number of points to 2
-                    if (collision.manifold.contacts.length > 2) {
-                        let deepestContact = collision.manifold.contacts[0];
-                        let deepestDepth = 0;
-
-                        for (const contact of collision.manifold.contacts) {
-                            const depth = Vec2.sub(contact.worldPosB, contact.worldPosA).magnitudeSquared();
-                            if (depth > deepestDepth) {
-                                deepestContact = contact;
-                                deepestDepth = depth;
-                            }
-                        }
-
-                        let furthestContact = collision.manifold.contacts[0];
-                        let furthestDistance = 0;
-
-                        for (const contact of collision.manifold.contacts) {
-                            const distance = Vec2.sub(contact.worldPosA, deepestContact.worldPosA).magnitudeSquared();
-                            if (distance > furthestDistance) {
-                                furthestContact = contact;
-                                furthestDistance = distance;
-                            }
-                        }
-
-                        collision.manifold.contacts[0] = deepestContact;
-                        collision.manifold.contacts[1] = furthestContact;
-                        collision.manifold.contacts.length = 2;
-                    }
+                    collision.updateContactPoints(newContact);
                 }
 
                 this.collisions.set(collision.id, collision);
             }
         }
 
-        // remove resolved collisions
-        for (const id of resolvedCollisionIds) {
+        // Remove ids in this list indicate that the collision no longer persists
+        for (const id of existingCollisionIds) {
             this.collisions.delete(id);
         }
     }
 
-    checkCollision(bodyA: RigidBody, bodyB: RigidBody): Collision | undefined {
+    private checkCollision(bodyA: RigidBody, bodyB: RigidBody): Collision | undefined {
         const colliderA = bodyA.collider;
         const colliderB = bodyB.collider;
 
@@ -281,21 +249,3 @@ export class PhysicsEngine {
         return collision;
     }
 }
-
-export type PhysicsEngineConfig = {
-    gravity: number;
-    stepsPerSecond: number;
-    velocityIterations: number;
-    sleepLinearThreshold: number;
-    sleepAngularThreshold: number;
-    sleepTimeThreshold: number;
-};
-
-export const PhysicsEngineConfigDefault: PhysicsEngineConfig = {
-    gravity: 981,
-    stepsPerSecond: 500,
-    velocityIterations: 5,
-    sleepLinearThreshold: 0.15,
-    sleepAngularThreshold: 0.15,
-    sleepTimeThreshold: 0.5,
-};
